@@ -1,0 +1,101 @@
+---
+import Base from "../layouts/Base.astro";
+import AudioPlayer from "../components/AudioPlayer.astro";
+import EngineCompare from "../components/EngineCompare.astro";
+
+const articles = import.meta.glob("../data/articles/*.json", { eager: true, import: "default" });
+const audios = import.meta.glob("../data/audio/*.json", { eager: true, import: "default" });
+const slugOf = (p: string) => p.split("/").pop()!.replace(".json", "");
+
+export function getStaticPaths() {
+  const a = import.meta.glob("../data/articles/*.json", { eager: true, import: "default" });
+  return Object.keys(a).map((p) => ({ params: { slug: p.split("/").pop()!.replace(".json", "") } }));
+}
+
+const { slug } = Astro.params;
+const art: any = Object.entries(articles).find(([p]) => slugOf(p) === slug)![1];
+const audio: any = Object.entries(audios).find(([p]) => slugOf(p) === slug)?.[1];
+
+const dateRu = (iso: string) => new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+const fmt = (x: number) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, "0")}`;
+const iso8601 = (s: number) => `PT${Math.floor(s / 60)}M${Math.round(s % 60)}S`;
+const voiceLabel = audio && ({ espeak: "синтез espeak (черновой)", piper: "голос Piper", elevenlabs: "голос ElevenLabs", openai: "голос OpenAI", google: "голос Google" } as Record<string, string>)[audio.engine];
+const description = art.blocks.find((b: any) => b.type === "p").sentences.slice(0, 2).map((s: any) => s.text).join(" ").slice(0, 158);
+
+const jsonld = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  headline: art.title,
+  inLanguage: art.lang,
+  isBasedOn: art.sourceUrl,
+  license: art.licenseUrl,
+  ...(audio && {
+    audio: {
+      "@type": "AudioObject",
+      contentUrl: new URL(audio.src, Astro.site).href,
+      encodingFormat: "audio/mpeg",
+      duration: iso8601(audio.duration),
+      contentSize: `${Math.round(audio.bytes / 1024)} KB`,
+    },
+  }),
+};
+---
+
+<Base title={`${art.title}: аудиоверсия`} description={description} lang={art.lang} jsonld={jsonld}>
+  <article>
+    <p class="eyebrow">Аудиостатья · первые {art.wordsRead} слов</p>
+    <h1>{art.title}</h1>
+
+    {audio
+      ? <AudioPlayer slug={slug!} title={art.title} src={audio.src} duration={audio.duration}
+                     chapters={audio.chapters} marks={audio.marks} voiceLabel={voiceLabel} />
+      : <p class="noaudio">Аудио ещё не сгенерировано: <code>npm run audio {slug}</code></p>}
+
+    {audio && <EngineCompare current={audio.engine} />}
+
+    <div class="prose">
+      {art.blocks.map((b: any) => {
+        if (b.type === "h2" || b.type === "h3") {
+          const H = b.type;
+          const t = audio?.marks[b.id]?.[0];
+          return (
+            <H data-s={b.id}>
+              {b.text}
+              {t !== undefined && (
+                <button type="button" class="ap-tc" data-ap-tc={slug} data-t={t} aria-label={`Слушать раздел «${b.text}» с ${fmt(t)}`}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" /></svg>{fmt(t)}
+                </button>
+              )}
+            </H>
+          );
+        }
+        const inner = b.sentences.map((s: any, i: number) => <><span data-s={s.id}>{s.text}</span>{i < b.sentences.length - 1 ? " " : ""}</>);
+        if (b.type === "quote") return <blockquote><p>{inner}</p></blockquote>;
+        if (b.type === "cite") return <p class="cite">{inner}</p>;
+        return <p>{inner}</p>;
+      })}
+    </div>
+
+    <footer class="source">
+      <p>
+        Текст: статья «<a href={art.sourceUrl} rel="noopener">{art.title}</a>» из Википедии,
+        версия от {dateRu(art.revTimestamp)} (<a href={`https://ru.wikipedia.org/w/index.php?oldid=${art.revid}`} rel="noopener">ревизия {art.revid}</a>),
+        авторы — участники Википедии. Лицензия <a href={art.licenseUrl} rel="license noopener">{art.license}</a>.
+        Здесь приведены и озвучены первые {art.wordsRead} слов статьи; аудиоверсия распространяется на тех же условиях.
+      </p>
+    </footer>
+  </article>
+</Base>
+
+<style>
+  .eyebrow { margin: 0 0 6px; font: 600 12.5px/1.4 var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 0; font: 700 clamp(30px, 5vw, 42px)/1.15 var(--serif); letter-spacing: -.01em; }
+  .prose :global(h2) { font: 700 26px/1.25 var(--serif); margin: 2em 0 .5em; }
+  .prose :global(h3) { font: 700 21px/1.3 var(--serif); margin: 1.6em 0 .4em; }
+  .prose :global(p) { margin: 0 0 1em; }
+  blockquote { margin: 1.2em 0 .4em; padding: 2px 0 2px 20px; border-left: 3px solid var(--line); color: var(--muted); font-style: italic; }
+  blockquote p { margin: 0; }
+  .cite { text-align: right; color: var(--muted); font-size: 16px; }
+  .source { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font: 14px/1.55 var(--sans); color: var(--muted); }
+  .noaudio { font: 14px var(--sans); color: var(--muted); }
+</style>

@@ -1,0 +1,504 @@
+---
+/**
+ * Плеер аудиоверсии статьи. Нативный <audio> + ~8 KB своего JS, без зависимостей.
+ * Тайм-коды:
+ * - полоса прогресса разбита на главы (как на YouTube), при наведении и перетаскивании
+ *   подсказка «2:15 · Название главы»;
+ * - оглавление с тайм-кодом и длительностью каждой главы, прогресс текущей главы;
+ * - у заголовков в тексте кнопка-тайм-код «▶ 1:04» (рендерит страница, см. TimeCode.astro);
+ * - «Ссылка на момент»: копирует адрес вида …/#t-125, по нему плеер встаёт на 2:05;
+ *   понимает и #t=125, #t=2:05, #t=2m5s, ?t=125;
+ * - кнопки и клавиши N / P — следующая и предыдущая глава.
+ * Остальное: скорость 0.75–2×, ±15 с, подсветка звучащего предложения и переход кликом,
+ * мини-плеер снизу, Media Session (экран блокировки, наушники), запоминание позиции и скорости.
+ * Аудио не грузится, пока не нажали Play (preload="none").
+ */
+interface Chapter { title: string; start: number }
+interface Props {
+  slug: string;
+  title: string;
+  src: string;
+  duration: number;
+  chapters: Chapter[];
+  marks: Record<string, [number, number]>;
+  voiceLabel?: string;
+}
+const { slug, title, src, duration, chapters, marks, voiceLabel } = Astro.props;
+const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const minutes = Math.max(1, Math.round(duration / 60));
+const segs = chapters.map((c, i) => {
+  const end = chapters[i + 1]?.start ?? duration;
+  return { ...c, end, len: end - c.start };
+});
+const iconPrev = "M6 5h2v14H6zM19 5v14L9.5 12z";
+const iconNext = "M16 5h2v14h-2zM5 5v14l9.5-7z";
+---
+
+<section class="ap" data-ap data-slug={slug} aria-label="Аудиоверсия статьи">
+  <audio preload="none" src={src}></audio>
+  <script type="application/json" data-ap-data set:html={JSON.stringify({ title, duration, chapters, marks })} />
+
+  <div class="ap-main">
+    <button class="ap-play" type="button" data-ap-toggle aria-label="Слушать статью">
+      <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" /></svg>
+      <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
+      <span class="ap-spin" aria-hidden="true"></span>
+    </button>
+
+    <div class="ap-body">
+      <div class="ap-head">
+        <span class="ap-label" data-ap-label>Слушать статью</span>
+        <span class="ap-meta">{minutes} мин · {chapters.length} глав{voiceLabel && <> · {voiceLabel}</>}</span>
+      </div>
+      <div class="ap-chapter">
+        <span class="ap-chnum" data-ap-chnum>Глава 1 из {chapters.length}</span>
+        <span data-ap-chapter>{chapters[0]?.title}</span>
+      </div>
+
+      <div class="ap-track" data-ap-track>
+        <div class="ap-segs" aria-hidden="true">
+          {segs.map((s) => <div class="ap-seg" style={`flex-grow:${s.len.toFixed(2)}`}><i></i></div>)}
+        </div>
+        <input class="ap-seek" type="range" min="0" max={duration} step="0.1" value="0"
+               data-ap-seek aria-label="Позиция в аудио" aria-valuetext={`0:00 из ${fmt(duration)}`} />
+        <div class="ap-tip" data-ap-tip hidden><b data-ap-tiptime>0:00</b><span data-ap-tipch></span></div>
+      </div>
+
+      <div class="ap-row">
+        <span class="ap-time"><span data-ap-cur>0:00</span> / {fmt(duration)}</span>
+        <div class="ap-ctrls">
+          <button type="button" class="ap-btn" data-ap-chstep="-1" aria-label="Предыдущая глава (P)" title="Предыдущая глава (P)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d={iconPrev} /></svg>
+          </button>
+          <button type="button" class="ap-btn" data-ap-skip="-15" aria-label="Назад на 15 секунд">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z" /></svg><b>15</b>
+          </button>
+          <button type="button" class="ap-btn" data-ap-skip="15" aria-label="Вперёд на 15 секунд">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2l5 4-5 4V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8z" /></svg><b>15</b>
+          </button>
+          <button type="button" class="ap-btn" data-ap-chstep="1" aria-label="Следующая глава (N)" title="Следующая глава (N)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d={iconNext} /></svg>
+          </button>
+          <button type="button" class="ap-btn ap-speed" data-ap-speed aria-label="Скорость">1×</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ap-toc">
+    <div class="ap-toc-head">
+      <span>Содержание</span>
+      <button type="button" class="ap-link" data-ap-share>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 13.4a1 1 0 0 1 0-1.4l3.5-3.5a3 3 0 1 1 4.2 4.2l-2 2-1.4-1.4 2-2a1 1 0 1 0-1.4-1.4L12 13.4a1 1 0 0 1-1.4 0zM13.4 10.6a1 1 0 0 1 0 1.4l-3.5 3.5a3 3 0 1 1-4.2-4.2l2-2 1.4 1.4-2 2a1 1 0 1 0 1.4 1.4L12 10.6a1 1 0 0 1 1.4 0z" /></svg>
+        <span data-ap-sharelabel>Ссылка на этот момент</span>
+      </button>
+    </div>
+    <ol class="ap-chapters">
+      {segs.map((s, i) => (
+        <li>
+          <button type="button" data-ap-goto={s.start} data-i={i} aria-label={`${s.title}, с ${fmt(s.start)}`}>
+            <span class="ap-chn">{i + 1}</span>
+            <span class="ap-cht">{s.title}</span>
+            <time class="ap-chs">{fmt(s.start)}</time>
+            <span class="ap-chl">{fmt(s.len)}</span>
+            <i class="ap-chp" aria-hidden="true"></i>
+          </button>
+        </li>
+      ))}
+    </ol>
+    <input class="ap-sharefield" data-ap-sharefield readonly hidden aria-label="Ссылка на момент" />
+  </div>
+  <p class="ap-hint">Нажмите на тайм-код у заголовка или на любое предложение в тексте, чтобы слушать с этого места.</p>
+</section>
+
+<div class="ap-mini" data-ap-mini hidden>
+  <div class="ap-mini-bar"><i data-ap-minibar></i></div>
+  <button type="button" class="ap-mini-play" data-ap-toggle aria-label="Пауза">
+    <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" /></svg>
+    <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
+  </button>
+  <button type="button" class="ap-mini-text" data-ap-scrollto>
+    <span class="ap-mini-title">{title}</span>
+    <span class="ap-mini-ch"><span data-ap-chnum></span> · <span data-ap-chapter>{chapters[0]?.title}</span></span>
+  </button>
+  <span class="ap-mini-time"><span data-ap-cur>0:00</span> / {fmt(duration)}</span>
+  <button type="button" class="ap-btn" data-ap-chstep="1" aria-label="Следующая глава">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d={iconNext} /></svg>
+  </button>
+  <button type="button" class="ap-btn ap-speed" data-ap-speed aria-label="Скорость">1×</button>
+  <button type="button" class="ap-mini-close" data-ap-close aria-label="Закрыть мини-плеер">✕</button>
+</div>
+
+<script>
+  const SPEEDS = [1, 1.25, 1.5, 1.75, 2, 0.75];
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const store = {
+    get(k: string) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* приватный режим */ } },
+  };
+
+  /** #t-125, #t=125, #t=2:05, #t=2m5s, ?t=125 -> секунды */
+  function timeFromUrl(): number | null {
+    const raw = (location.hash.match(/^#t[-=]([\w:.]+)$/)?.[1]) ?? new URLSearchParams(location.search).get("t");
+    if (!raw) return null;
+    if (/^\d+(\.\d+)?$/.test(raw)) return Number(raw);
+    const mmss = raw.match(/^(?:(\d+):)?(\d+):(\d{1,2})$|^(\d+):(\d{1,2})$/);
+    if (mmss) return mmss[5] ? Number(mmss[4]) * 60 + Number(mmss[5]) : Number(mmss[1] ?? 0) * 3600 + Number(mmss[2]) * 60 + Number(mmss[3]);
+    const hms = raw.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);
+    if (hms && (hms[1] || hms[2] || hms[3])) return Number(hms[1] ?? 0) * 3600 + Number(hms[2] ?? 0) * 60 + Number(hms[3] ?? 0);
+    return null;
+  }
+
+  for (const root of document.querySelectorAll<HTMLElement>("[data-ap]")) {
+    const audio = root.querySelector("audio")!;
+    const data = JSON.parse(root.querySelector("[data-ap-data]")!.textContent!);
+    const mini = root.nextElementSibling as HTMLElement;
+    const all = (sel: string) => [...root.querySelectorAll<HTMLElement>(sel), ...mini.querySelectorAll<HTMLElement>(sel)];
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const seek = $<HTMLInputElement>("[data-ap-seek]");
+    const track = $("[data-ap-track]");
+    const tip = $("[data-ap-tip]");
+    const segFills = [...root.querySelectorAll<HTMLElement>(".ap-seg i")];
+    const chButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-ap-goto]")];
+    const minibar = mini.querySelector<HTMLElement>("[data-ap-minibar]")!;
+    const key = `ap:${root.dataset.slug}`;
+    const dur = data.duration as number;
+    const chapters = (data.chapters as { title: string; start: number }[])
+      .map((c, i, a) => ({ ...c, end: a[i + 1]?.start ?? dur }));
+
+    const marks = Object.entries(data.marks as Record<string, [number, number]>)
+      .map(([id, [a, b]]) => ({ id, a, b, el: document.querySelector<HTMLElement>(`[data-s="${id}"]`) }))
+      .sort((x, y) => x.a - y.a);
+
+    let started = false, dragging = false, miniClosed = false, lastSid = "", lastCh = -1, userScrollAt = 0;
+
+    // ------- воспроизведение
+    const play = () => { started = true; root.classList.add("is-started"); document.body.classList.add("ap-active"); return audio.play(); };
+    const toggle = () => (audio.paused ? play() : audio.pause());
+    const clamp = (t: number) => Math.min(Math.max(0, t), dur - 0.1);
+    const jump = (t: number) => { audio.currentTime = clamp(t); paint(audio.currentTime); };
+    const chapterAt = (t: number) => { let i = 0; chapters.forEach((c, k) => { if (t >= c.start - 0.05) i = k; }); return i; };
+    const stepChapter = (d: number) => {
+      const t = audio.currentTime, i = chapterAt(t);
+      // «назад» в первые 3 с главы — на предыдущую, иначе в начало текущей (как в плеерах подкастов)
+      const target = d > 0 ? i + 1 : (t - chapters[i].start > 3 ? i : i - 1);
+      if (target >= 0 && target < chapters.length) { jump(chapters[target].start); if (!started) play(); }
+    };
+
+    all("[data-ap-toggle]").forEach((b) => b.addEventListener("click", toggle));
+    all("[data-ap-skip]").forEach((b) => b.addEventListener("click", () => jump(audio.currentTime + Number(b.dataset.apSkip))));
+    all("[data-ap-chstep]").forEach((b) => b.addEventListener("click", () => stepChapter(Number(b.dataset.apChstep))));
+    chButtons.forEach((b) => b.addEventListener("click", () => { jump(Number(b.dataset.apGoto)); play(); }));
+
+    // тайм-коды у заголовков в тексте статьи
+    document.querySelectorAll<HTMLButtonElement>(`[data-ap-tc="${root.dataset.slug}"]`).forEach((b) =>
+      b.addEventListener("click", () => { jump(Number(b.dataset.t)); play(); }));
+
+    // ------- скорость
+    const setSpeed = (r: number) => {
+      audio.playbackRate = r;
+      all("[data-ap-speed]").forEach((b) => (b.textContent = `${r}×`));
+      store.set("ap:speed", String(r));
+    };
+    all("[data-ap-speed]").forEach((b) => b.addEventListener("click", () => setSpeed(SPEEDS[(SPEEDS.indexOf(audio.playbackRate) + 1) % SPEEDS.length])));
+    setSpeed(Number(store.get("ap:speed")) || 1);
+
+    // ------- полоса: перетаскивание и подсказка «время · глава»
+    const showTip = (t: number) => {
+      const r = track.getBoundingClientRect();
+      tip.hidden = false;
+      $("[data-ap-tiptime]").textContent = fmt(t);
+      $("[data-ap-tipch]").textContent = chapters[chapterAt(t)].title;
+      const w = tip.offsetWidth, x = (t / dur) * r.width;
+      tip.style.left = `${Math.min(Math.max(x - w / 2, 0), r.width - w)}px`;
+    };
+    track.addEventListener("pointermove", (e) => {
+      const r = track.getBoundingClientRect();
+      showTip(((e.clientX - r.left) / r.width) * dur);
+    });
+    track.addEventListener("pointerleave", () => { if (!dragging) tip.hidden = true; });
+    seek.addEventListener("input", () => { dragging = true; paint(Number(seek.value), true); showTip(Number(seek.value)); });
+    seek.addEventListener("change", () => { dragging = false; tip.hidden = true; jump(Number(seek.value)); if (!started) play(); });
+    seek.addEventListener("blur", () => (tip.hidden = true));
+
+    // ------- ссылка на момент
+    const shareLabel = $("[data-ap-sharelabel]");
+    const shareField = $<HTMLInputElement>("[data-ap-sharefield]");
+    $("[data-ap-share]").addEventListener("click", async () => {
+      const t = Math.floor(audio.currentTime || Number(seek.value) || 0);
+      const url = `${location.href.split("#")[0].replace(/[?&]t=[^&#]*/, "")}#t-${t}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        shareLabel.textContent = `Скопировано: ${fmt(t)}`;
+        shareField.hidden = true;
+      } catch {
+        shareField.hidden = false; shareField.value = url; shareField.select();
+        shareLabel.textContent = "Скопируйте ссылку";
+      }
+      setTimeout(() => (shareLabel.textContent = "Ссылка на этот момент"), 2500);
+    });
+
+    // ------- текст: подсветка и клик по предложению
+    const sentenceAt = (t: number) => {
+      let lo = 0, hi = marks.length - 1, ans = -1;
+      while (lo <= hi) { const m = (lo + hi) >> 1; if (marks[m].a <= t) { ans = m; lo = m + 1; } else hi = m - 1; }
+      return ans >= 0 && t < marks[ans].b + 0.6 ? marks[ans] : null;
+    };
+    for (const m of marks) {
+      m.el?.addEventListener("click", (e) => {
+        if (!started || window.getSelection()?.toString() || (e.target as HTMLElement).closest("[data-ap-tc]")) return;
+        jump(m.a); play();
+      });
+    }
+    ["wheel", "touchmove", "keydown"].forEach((ev) => window.addEventListener(ev, () => (userScrollAt = Date.now()), { passive: true }));
+
+    function paint(t: number, preview = false) {
+      if (!dragging || preview) seek.value = String(t);
+      seek.setAttribute("aria-valuetext", `${fmt(t)} из ${fmt(dur)}, ${chapters[chapterAt(t)].title}`);
+      all("[data-ap-cur]").forEach((e) => (e.textContent = fmt(t)));
+      minibar.style.width = `${(t / dur) * 100}%`;
+      chapters.forEach((c, i) => {
+        const p = t >= c.end ? 1 : t <= c.start ? 0 : (t - c.start) / (c.end - c.start);
+        segFills[i].style.width = `${p * 100}%`;
+        chButtons[i].style.setProperty("--chp", `${p * 100}%`);
+        chButtons[i].classList.toggle("is-done", p >= 1);
+      });
+      const ch = chapterAt(t);
+      if (ch !== lastCh) {
+        lastCh = ch;
+        all("[data-ap-chapter]").forEach((e) => (e.textContent = chapters[ch].title));
+        all("[data-ap-chnum]").forEach((e) => (e.textContent = `Глава ${ch + 1} из ${chapters.length}`));
+        chButtons.forEach((b, i) => { b.classList.toggle("is-current", i === ch); b.toggleAttribute("aria-current", i === ch); });
+      }
+      if (preview) return;
+      const s = started ? sentenceAt(t) : null;
+      const sid = s?.id ?? "";
+      if (sid !== lastSid) {
+        document.querySelectorAll(".is-speaking").forEach((e) => e.classList.remove("is-speaking"));
+        if (s?.el) {
+          s.el.classList.add("is-speaking");
+          const r = s.el.getBoundingClientRect();
+          if (!audio.paused && (r.top < 80 || r.bottom > innerHeight - 110) && Date.now() - userScrollAt > 4000) {
+            s.el.scrollIntoView({ block: "center", behavior: "smooth" });
+          }
+        }
+        lastSid = sid;
+      }
+    }
+
+    // ------- состояние
+    audio.addEventListener("timeupdate", () => {
+      paint(audio.currentTime);
+      if (Math.floor(audio.currentTime) % 5 === 0) store.set(key, String(audio.currentTime));
+      if ("mediaSession" in navigator && navigator.mediaSession.setPositionState) {
+        try { navigator.mediaSession.setPositionState({ duration: dur, position: audio.currentTime, playbackRate: audio.playbackRate }); } catch { /* */ }
+      }
+    });
+    const state = () => {
+      const playing = !audio.paused;
+      [root, mini].forEach((e) => e.classList.toggle("is-playing", playing));
+      all("[data-ap-toggle]").forEach((b) => b.setAttribute("aria-label", playing ? "Пауза" : "Слушать"));
+      if (playing) syncMini();
+    };
+    audio.addEventListener("play", state);
+    audio.addEventListener("pause", state);
+    audio.addEventListener("waiting", () => root.classList.add("is-loading"));
+    audio.addEventListener("playing", () => root.classList.remove("is-loading"));
+    audio.addEventListener("ended", () => { store.set(key, "0"); document.querySelectorAll(".is-speaking").forEach((e) => e.classList.remove("is-speaking")); });
+
+    // стартовая позиция: тайм-код из ссылки важнее сохранённой позиции
+    let startAt = 0;
+    const fromUrl = timeFromUrl();
+    const saved = Number(store.get(key));
+    if (fromUrl !== null && fromUrl < dur) {
+      startAt = fromUrl;
+      $("[data-ap-label]").textContent = `Слушать с ${fmt(fromUrl)}`;
+    } else if (saved > 5 && saved < dur - 5) {
+      startAt = saved;
+      $("[data-ap-label]").textContent = `Продолжить с ${fmt(saved)}`;
+    }
+    if (startAt) audio.addEventListener("loadedmetadata", () => { if (audio.currentTime < 1) audio.currentTime = startAt; }, { once: true });
+    window.addEventListener("hashchange", () => { const t = timeFromUrl(); if (t !== null) { jump(t); play(); } });
+
+    // ------- мини-плеер
+    let mainVisible = true;
+    const syncMini = () => { mini.hidden = !(started && !mainVisible && !miniClosed); };
+    new IntersectionObserver(([e]) => { mainVisible = e.isIntersecting; syncMini(); }, { rootMargin: "-60px 0px 0px 0px" }).observe(root);
+    mini.querySelector("[data-ap-close]")!.addEventListener("click", () => { miniClosed = true; audio.pause(); syncMini(); });
+    mini.querySelector("[data-ap-scrollto]")!.addEventListener("click", () => {
+      (document.querySelector(".is-speaking") ?? root).scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+    audio.addEventListener("play", () => { miniClosed = false; });
+
+    // ------- клавиатура: внутри плеера пробел, ←/→ (15 с); на всей странице N/P — главы, когда звук запущен
+    [root, mini].forEach((el) => el.addEventListener("keydown", (e) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === "INPUT") return;
+      if (e.key === " " && t.tagName !== "BUTTON") { e.preventDefault(); toggle(); }
+      if (e.key === "ArrowLeft") jump(audio.currentTime - 15);
+      if (e.key === "ArrowRight") jump(audio.currentTime + 15);
+    }));
+    window.addEventListener("keydown", (e) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (!started || e.metaKey || e.ctrlKey || e.altKey || el?.closest("input, textarea, select, [contenteditable]")) return;
+      if (e.key === "n" || e.key === "N" || e.key === "т" || e.key === "Т") stepChapter(1);
+      if (e.key === "p" || e.key === "P" || e.key === "з" || e.key === "З") stepChapter(-1);
+    });
+
+    // ------- экран блокировки, наушники, CarPlay
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: data.title, artist: document.title.split(" — ").pop() ?? "", album: "Аудиоверсия" });
+      const h: [MediaSessionAction, MediaSessionActionHandler][] = [
+        ["play", () => play()],
+        ["pause", () => audio.pause()],
+        ["seekbackward", (d) => jump(audio.currentTime - (d.seekOffset ?? 15))],
+        ["seekforward", (d) => jump(audio.currentTime + (d.seekOffset ?? 15))],
+        ["seekto", (d) => jump(d.seekTime ?? 0)],
+        ["previoustrack", () => stepChapter(-1)],
+        ["nexttrack", () => stepChapter(1)],
+      ];
+      for (const [a, fn] of h) { try { navigator.mediaSession.setActionHandler(a, fn); } catch { /* не поддерживается */ } }
+    }
+
+    paint(startAt, true);
+  }
+</script>
+
+<style is:global>
+  .ap {
+    margin: 28px 0 36px; padding: 18px 20px 14px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+    font-family: var(--sans);
+  }
+  .ap-main { display: flex; gap: 16px; align-items: flex-start; }
+  .ap-play {
+    position: relative; flex: none; width: 56px; height: 56px; border-radius: 50%;
+    border: 0; background: var(--accent); color: var(--on-accent); cursor: pointer;
+    display: grid; place-items: center; transition: transform .15s ease;
+  }
+  .ap-play:hover { transform: scale(1.05); }
+  .ap button:focus-visible, .ap-mini button:focus-visible, .ap-tc:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ap-play svg, .ap-mini-play svg { width: 26px; height: 26px; fill: currentColor; }
+  .ap-play .i-play { margin-left: 3px; }
+  .i-pause, .is-playing .i-play { display: none; }
+  .is-playing .i-pause { display: block; }
+  .ap-spin { position: absolute; inset: -4px; border-radius: 50%; border: 2px solid transparent; }
+  .ap.is-loading .ap-spin { border-top-color: var(--accent); animation: ap-spin .8s linear infinite; }
+  @keyframes ap-spin { to { transform: rotate(360deg); } }
+
+  .ap-body { flex: 1; min-width: 0; }
+  .ap-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .ap-label { font-weight: 650; font-size: 15px; }
+  .ap-meta { font-size: 13px; color: var(--muted); }
+  .ap-chapter { display: flex; gap: 8px; align-items: baseline; margin: 3px 0 10px; font-size: 13px; color: var(--muted); min-width: 0; }
+  .ap-chapter [data-ap-chapter] { color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ap-chnum { flex: none; font: 600 11px/1.6 var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+
+  /* полоса из сегментов-глав, поверх неё прозрачный range для перетаскивания и клавиатуры */
+  .ap-track { position: relative; height: 22px; display: flex; align-items: center; touch-action: none; }
+  .ap-segs { position: absolute; left: 0; right: 0; top: 8px; height: 6px; display: flex; gap: 3px; pointer-events: none; }
+  .ap-seg { flex: 1 1 0; min-width: 4px; height: 100%; border-radius: 3px; background: var(--track); overflow: hidden; transition: transform .12s; }
+  .ap-seg i { display: block; height: 100%; width: 0; background: var(--accent); }
+  .ap-track:hover .ap-seg { transform: scaleY(1.5); }
+  .ap-seek { position: relative; width: 100%; height: 22px; margin: 0; opacity: 0; cursor: pointer; }
+  .ap-track:has(.ap-seek:focus-visible) .ap-segs { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+  .ap-tip {
+    position: absolute; bottom: 26px; z-index: 2; display: flex; gap: 6px; align-items: baseline;
+    max-width: 260px; padding: 5px 8px; border-radius: 7px; pointer-events: none;
+    background: var(--mini-bg); color: var(--mini-fg); font-size: 12.5px; white-space: nowrap;
+  }
+  .ap-tip b { font: 600 12.5px/1.3 var(--mono); font-variant-numeric: tabular-nums; }
+  .ap-tip span { overflow: hidden; text-overflow: ellipsis; opacity: .8; }
+
+  .ap-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+  .ap-time { font: 500 12.5px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ap-ctrls { display: flex; gap: 2px; align-items: center; }
+  .ap-btn {
+    display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 0 8px; border-radius: 8px;
+    border: 1px solid transparent; background: transparent; color: var(--fg); font: 600 13px/1 var(--sans); cursor: pointer;
+  }
+  .ap-btn:hover { background: var(--hover); }
+  .ap-btn svg { width: 18px; height: 18px; fill: currentColor; }
+  .ap-btn b { font: 600 10.5px/1 var(--mono); margin-left: -1px; }
+  .ap-speed { min-width: 46px; justify-content: center; border-color: var(--line); font-family: var(--mono); font-size: 12.5px; margin-left: 4px; }
+
+  /* оглавление с тайм-кодами */
+  .ap-toc { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .ap-toc-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .ap-toc-head > span { font: 600 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ap-link {
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border: 0; border-radius: 7px;
+    background: none; color: var(--accent); font: 500 13px/1.2 var(--sans); cursor: pointer;
+  }
+  .ap-link:hover { background: var(--hover); }
+  .ap-link svg { width: 16px; height: 16px; fill: currentColor; }
+  .ap-chapters { list-style: none; margin: 0; padding: 0; }
+  .ap-chapters button {
+    --chp: 0%;
+    position: relative; display: grid; grid-template-columns: 22px 1fr auto auto; gap: 10px; align-items: baseline;
+    width: 100%; padding: 8px 8px 9px; border: 0; border-radius: 8px; overflow: hidden;
+    background: none; color: var(--fg); font: 14px/1.35 var(--sans); text-align: left; cursor: pointer;
+  }
+  .ap-chapters button:hover { background: var(--hover); }
+  .ap-chn { color: var(--muted); font: 12px/1.6 var(--mono); }
+  .ap-cht { min-width: 0; }
+  .ap-chs { font: 600 12.5px/1.6 var(--mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+  .ap-chl { font: 12px/1.6 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; }
+  .ap-chp { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 2px; border-radius: 2px; background: transparent; }
+  .ap-chapters button.is-current .ap-chp { background: linear-gradient(to right, var(--accent) var(--chp), var(--track) var(--chp)); }
+  .ap-chapters button.is-current { font-weight: 600; }
+  .ap-chapters button.is-done .ap-cht { color: var(--muted); }
+  .ap-sharefield { width: 100%; margin-top: 6px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font: 12.5px var(--mono); }
+
+  .ap-hint { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
+
+  /* тайм-код у заголовка в тексте */
+  .ap-tc {
+    display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; padding: 2px 8px 2px 6px; vertical-align: 4px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--accent);
+    font: 600 12.5px/1.4 var(--mono); font-variant-numeric: tabular-nums; cursor: pointer;
+  }
+  .ap-tc:hover { border-color: var(--accent); }
+  .ap-tc svg { width: 11px; height: 11px; fill: currentColor; }
+
+  /* текст: звучащее предложение */
+  .ap-active [data-s] { cursor: pointer; border-radius: 3px; transition: background-color .25s; }
+  .ap-active [data-s]:hover { background: var(--hover); }
+  [data-s].is-speaking { background: var(--speak) !important; box-shadow: 0 0 0 2px var(--speak); }
+
+  /* мини-плеер */
+  .ap-mini {
+    position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50; transform: translateX(-50%);
+    width: min(720px, calc(100% - 24px)); display: flex; align-items: center; gap: 8px;
+    padding: 8px 8px 8px 8px; border-radius: 14px; overflow: hidden;
+    background: var(--mini-bg); color: var(--mini-fg); box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    font-family: var(--sans); animation: ap-up .2s ease-out;
+  }
+  .ap-mini[hidden] { display: none; }
+  @keyframes ap-up { from { transform: translate(-50%, 12px); opacity: 0; } }
+  .ap-mini-bar { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--track); opacity: .5; }
+  .ap-mini-bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+  .ap-mini-play { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; cursor: pointer; }
+  .ap-mini-play svg { width: 20px; height: 20px; }
+  .ap-mini-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; border: 0; background: none; color: inherit; cursor: pointer; text-align: left; padding: 0; }
+  .ap-mini-title, .ap-mini-ch { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ap-mini-title { font-size: 13.5px; font-weight: 600; }
+  .ap-mini-ch { font-size: 12px; opacity: .7; }
+  .ap-mini-time { font: 12px/1 var(--mono); opacity: .75; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ap-mini .ap-btn { color: inherit; }
+  .ap-mini .ap-btn:hover { background: color-mix(in srgb, var(--mini-fg) 10%, transparent); }
+  .ap-mini .ap-speed { border-color: color-mix(in srgb, var(--mini-fg) 25%, transparent); }
+  .ap-mini-close { flex: none; width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: inherit; opacity: .6; cursor: pointer; }
+  .ap-mini-close:hover { opacity: 1; }
+  .ap-active main { padding-bottom: 90px; }
+
+  @media (max-width: 520px) {
+    .ap { padding: 14px 14px 12px; }
+    .ap-main { gap: 12px; }
+    .ap-play { width: 48px; height: 48px; }
+    .ap-chl, .ap-mini-time, .ap-mini [data-ap-chstep] { display: none; }
+    .ap-chapters button { grid-template-columns: 22px 1fr auto; }
+    .ap-tc { margin-left: 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ap *, .ap-mini { animation: none !important; transition: none !important; } }
+</style>

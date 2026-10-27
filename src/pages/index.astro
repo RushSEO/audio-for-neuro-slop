@@ -1,0 +1,16 @@
+---
+import Base from "../layouts/Base.astro";
+const articles = import.meta.glob("../data/articles/*.json", { eager: true, import: "default" });
+const audios = import.meta.glob("../data/audio/*.json", { eager: true, import: "default" });
+const list = Object.entries(articles).map(([p, a]: [string, any]) => {
+  const slug = p.split("/").pop()!.replace(".json", "");
+  const au: any = Object.entries(audios).find(([q]) => q.endsWith(`/${slug}.json`))?.[1];
+  return { slug, title: a.title, min: au ? Math.round(au.duration / 60) : null };
+});
+---
+<Base title="Аудиостатьи" description="Статьи с аудиоверсией.">
+  <h1 style="font: 700 34px/1.2 var(--serif)">Аудиостатьи</h1>
+  <ul>
+    {list.map((a) => <li><a href={`/${a.slug}/`}>{a.title}</a>{a.min && ` · ${a.min} мин`}</li>)}
+  </ul>
+</Base>

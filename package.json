@@ -1,0 +1,17 @@
+{
+  "name": "article-audio",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "fetch": "python3 scripts/fetch_wiki.py",
+    "prepare": "python3 scripts/prepare_article.py",
+    "audio": "python3 scripts/tts.py",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^7.4.2"
+  }
+}

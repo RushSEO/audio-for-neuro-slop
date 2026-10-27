@@ -1,0 +1,50 @@
+---
+interface Props { title: string; description: string; lang?: string; jsonld?: object }
+const { title, description, lang = "ru", jsonld } = Astro.props;
+---
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="color-scheme" content="light dark" />
+    {jsonld && <script type="application/ld+json" set:html={JSON.stringify(jsonld)} />}
+  </head>
+  <body>
+    <main><slot /></main>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --bg: #fbfaf7; --fg: #1c1b19; --muted: #6d6a63; --line: #e6e2d9; --surface: #ffffff; --hover: #f1eee7;
+    --accent: #1f5c4a; --on-accent: #ffffff; --track: #dcd7cc; --speak: #fff1b8;
+    --mini-bg: #1c1b19; --mini-fg: #f4f2ec;
+    --poi-bg: rgba(31, 92, 74, .04); --warn-bg: #fbe3d6; --warn-fg: #8a3412;
+    --serif: "Iowan Old Style", "Charter", "PT Serif", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141412; --fg: #ebe8e1; --muted: #9b978d; --line: #2c2b27; --surface: #1b1b18; --hover: #262521;
+      --accent: #7fd1b5; --on-accent: #0d211b; --track: #3a3933; --speak: #4a4214;
+      --mini-bg: #ebe8e1; --mini-fg: #141412; color-scheme: dark;
+      --poi-bg: rgba(127, 209, 181, .05); --warn-bg: #4a2414; --warn-fg: #f3b796;
+    }
+  }
+  :root[data-theme="dark"] {
+      --bg: #141412; --fg: #ebe8e1; --muted: #9b978d; --line: #2c2b27; --surface: #1b1b18; --hover: #262521;
+      --accent: #7fd1b5; --on-accent: #0d211b; --track: #3a3933; --speak: #4a4214;
+      --mini-bg: #ebe8e1; --mini-fg: #141412; color-scheme: dark;
+      --poi-bg: rgba(127, 209, 181, .05); --warn-bg: #4a2414; --warn-fg: #f3b796;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 18px/1.65 var(--serif); }
+  main { max-width: 720px; margin: 0 auto; padding-block: 40px 80px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  a { color: var(--accent); }
+</style>

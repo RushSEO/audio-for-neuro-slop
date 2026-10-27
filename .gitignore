@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.astro/
+.audio-cache/
+.env
+.DS_Store

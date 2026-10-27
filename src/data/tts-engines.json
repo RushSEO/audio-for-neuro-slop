@@ -1,0 +1,17 @@
+{
+  "checked": "2026-10-27",
+  "basis": "1000 слов русского текста = 7 100 символов ≈ 7,5 мин речи",
+  "current": "espeak",
+  "engines": [
+    { "id": "eleven-v4", "vendor": "ElevenLabs", "model": "v4 / v3 / Multilingual v2", "usd": 0.57, "tariff": "$0.08 за 1K символов", "note": "Самый живой русский голос, в v3 теги эмоций прямо в тексте" },
+    { "id": "eleven-turbo", "vendor": "ElevenLabs", "model": "v4 Turbo / Flash", "usd": 0.28, "tariff": "$0.04 за 1K символов", "note": "Вдвое дешевле v4" },
+    { "id": "gemini-pro", "vendor": "Google", "model": "Gemini 2.5 Pro TTS", "usd": 0.23, "approx": true, "tariff": "$20 за 1M аудиотокенов", "note": "Манера чтения задаётся промптом" },
+    { "id": "chirp3", "vendor": "Google", "model": "Chirp 3 HD", "usd": 0.21, "tariff": "$30 за 1M символов", "note": "1M символов в месяц бесплатно, это ~140 таких статей" },
+    { "id": "gemini-flash", "vendor": "Google", "model": "Gemini 2.5 Flash TTS", "usd": 0.11, "approx": true, "tariff": "$10 за 1M аудиотокенов", "note": "Промпт для манеры, в 2 раза дешевле Pro" },
+    { "id": "openai", "vendor": "OpenAI", "model": "gpt-4o-mini-tts", "usd": 0.11, "approx": true, "tariff": "~$0.015 за минуту", "note": "Отключается 6 января 2027", "warn": true },
+    { "id": "neural2", "vendor": "Google", "model": "Neural2", "usd": 0.11, "tariff": "$16 за 1M символов", "note": "1M символов в месяц бесплатно" },
+    { "id": "wavenet", "vendor": "Google", "model": "WaveNet / Standard", "usd": 0.03, "tariff": "$4 за 1M символов", "note": "4M символов в месяц бесплатно" },
+    { "id": "piper", "vendor": "Piper", "model": "локально, open source", "usd": 0, "tariff": "бесплатно", "note": "Работает офлайн на своём сервере, интонация ровная" },
+    { "id": "espeak", "vendor": "espeak-ng", "model": "формантный синтез", "usd": 0, "tariff": "бесплатно", "note": "Звучит как робот, годится только для проверки механики" }
+  ]
+}
