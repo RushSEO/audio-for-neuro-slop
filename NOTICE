@@ -1,0 +1,8 @@
+The MIT License covers the code (scripts/, src/, configuration files).
+It does not cover the demo content:
+
+- data-src/shredder.raw.txt, src/data/articles/shredder.json and
+  public/audio/shredder.mp3 are derived from the Wikipedia article
+  "Шреддер (Черепашки-ниндзя)" (revision 155470741, ru.wikipedia.org) by
+  Wikipedia contributors and are licensed under CC BY-SA 4.0:
+  https://creativecommons.org/licenses/by-sa/4.0/
